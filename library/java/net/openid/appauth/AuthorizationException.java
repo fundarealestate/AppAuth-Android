@@ -19,10 +19,13 @@ import static net.openid.appauth.Preconditions.checkNotNull;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
+import android.util.ArrayMap;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
-import androidx.collection.ArrayMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -44,6 +47,7 @@ import java.util.Map;
  * AuthorizationServiceConfiguration.RetrieveConfigurationCallback) configuration retrieval}.
  */
 @SuppressWarnings({"ThrowableInstanceNeverThrown", "ThrowableResultOfMethodCallIgnored"})
+@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 public final class AuthorizationException extends Exception {
 
     /**

@@ -16,8 +16,6 @@ package net.openid.appauth;
 
 import androidx.annotation.NonNull;
 
-import net.openid.appauth.browser.AnyBrowserMatcher;
-import net.openid.appauth.browser.BrowserMatcher;
 import net.openid.appauth.connectivity.ConnectionBuilder;
 import net.openid.appauth.connectivity.DefaultConnectionBuilder;
 
@@ -35,24 +33,11 @@ public class AppAuthConfiguration {
             new AppAuthConfiguration.Builder().build();
 
     @NonNull
-    private final BrowserMatcher mBrowserMatcher;
-
-    @NonNull
     private final ConnectionBuilder mConnectionBuilder;
 
     private AppAuthConfiguration(
-            @NonNull BrowserMatcher browserMatcher,
             @NonNull ConnectionBuilder connectionBuilder) {
-        mBrowserMatcher = browserMatcher;
         mConnectionBuilder = connectionBuilder;
-    }
-
-    /**
-     * Controls which browsers can be used for the authorization flow.
-     */
-    @NonNull
-    public BrowserMatcher getBrowserMatcher() {
-        return mBrowserMatcher;
     }
 
     /**
@@ -69,19 +54,8 @@ public class AppAuthConfiguration {
      */
     public static class Builder {
 
-        private BrowserMatcher mBrowserMatcher = AnyBrowserMatcher.INSTANCE;
         private ConnectionBuilder mConnectionBuilder = DefaultConnectionBuilder.INSTANCE;
 
-        /**
-         * Specify the browser matcher to use, which controls the browsers that can be used
-         * for authorization.
-         */
-        @NonNull
-        public Builder setBrowserMatcher(@NonNull BrowserMatcher browserMatcher) {
-            Preconditions.checkNotNull(browserMatcher, "browserMatcher cannot be null");
-            mBrowserMatcher = browserMatcher;
-            return this;
-        }
 
         /**
          * Specify the connection builder to use, which creates {@link java.net.HttpURLConnection}
@@ -99,7 +73,7 @@ public class AppAuthConfiguration {
          */
         @NonNull
         public AppAuthConfiguration build() {
-            return new AppAuthConfiguration(mBrowserMatcher, mConnectionBuilder);
+            return new AppAuthConfiguration(mConnectionBuilder);
         }
 
 

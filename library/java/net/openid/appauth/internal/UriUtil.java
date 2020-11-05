@@ -17,10 +17,10 @@ package net.openid.appauth.internal;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Pair;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.browser.customtabs.CustomTabsService;
-import androidx.core.util.Pair;
 
 import net.openid.appauth.Preconditions;
 
@@ -74,26 +74,6 @@ public final class UriUtil {
         return null;
     }
 
-    public static List<Bundle> toCustomTabUriBundle(Uri[] uris, int startIndex) {
-        Preconditions.checkArgument(startIndex >= 0, "startIndex must be positive");
-        if (uris == null || uris.length <= startIndex) {
-            return Collections.emptyList();
-        }
-
-        List<Bundle> uriBundles = new ArrayList<>(uris.length - startIndex);
-        for (int i = startIndex; i < uris.length; i++) {
-            if (uris[i] == null) {
-                Logger.warn("Null URI in possibleUris list - ignoring");
-                continue;
-            }
-
-            Bundle uriBundle = new Bundle();
-            uriBundle.putParcelable(CustomTabsService.KEY_URL, uris[i]);
-            uriBundles.add(uriBundle);
-        }
-
-        return uriBundles;
-    }
 
     @NonNull
     public static String formUrlEncode(@Nullable Map<String, String> parameters) {

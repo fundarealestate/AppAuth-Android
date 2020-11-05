@@ -14,33 +14,26 @@
 
 package net.openid.appauth;
 
-import static net.openid.appauth.Preconditions.checkNotNull;
-
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.PendingIntent;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.text.TextUtils;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
-import androidx.browser.customtabs.CustomTabsIntent;
 
 import net.openid.appauth.AuthorizationException.GeneralErrors;
 import net.openid.appauth.AuthorizationException.RegistrationRequestErrors;
 import net.openid.appauth.AuthorizationException.TokenRequestErrors;
 import net.openid.appauth.IdToken.IdTokenException;
-import net.openid.appauth.browser.BrowserDescriptor;
-import net.openid.appauth.browser.BrowserSelector;
-import net.openid.appauth.browser.CustomTabManager;
 import net.openid.appauth.connectivity.ConnectionBuilder;
 import net.openid.appauth.internal.Logger;
 import net.openid.appauth.internal.UriUtil;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -51,12 +44,8 @@ import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.util.Map;
 
+import static net.openid.appauth.Preconditions.checkNotNull;
 
-/**
- * Dispatches requests to an OAuth2 authorization service. Note that instances of this class
- * _must be manually disposed_ when no longer required, to avoid leaks
- * (see {@link #dispose()}.
- */
 public class AuthorizationService {
 
     @VisibleForTesting
@@ -65,141 +54,14 @@ public class AuthorizationService {
     @NonNull
     private final AppAuthConfiguration mClientConfiguration;
 
-    @NonNull
-    private final CustomTabManager mCustomTabManager;
-
-    @Nullable
-    private final BrowserDescriptor mBrowser;
-
-    private boolean mDisposed = false;
-
-    /**
-     * Creates an AuthorizationService instance, using the
-     * {@link AppAuthConfiguration#DEFAULT default configuration}. Note that
-     * instances of this class must be manually disposed when no longer required, to avoid
-     * leaks (see {@link #dispose()}.
-     */
-    public AuthorizationService(@NonNull Context context) {
-        this(context, AppAuthConfiguration.DEFAULT);
-    }
-
-    /**
-     * Creates an AuthorizationService instance, using the specified configuration. Note that
-     * instances of this class must be manually disposed when no longer required, to avoid
-     * leaks (see {@link #dispose()}.
-     */
-    public AuthorizationService(
-            @NonNull Context context,
-            @NonNull AppAuthConfiguration clientConfiguration) {
-        this(context,
-                clientConfiguration,
-                BrowserSelector.select(
-                        context,
-                        clientConfiguration.getBrowserMatcher()),
-                new CustomTabManager(context));
-    }
-
     /**
      * Constructor that injects a url builder into the service for testing.
      */
     @VisibleForTesting
     AuthorizationService(@NonNull Context context,
-                         @NonNull AppAuthConfiguration clientConfiguration,
-                         @Nullable BrowserDescriptor browser,
-                         @NonNull CustomTabManager customTabManager) {
+                         @NonNull AppAuthConfiguration clientConfiguration) {
         mContext = checkNotNull(context);
         mClientConfiguration = clientConfiguration;
-        mCustomTabManager = customTabManager;
-        mBrowser = browser;
-
-        if (browser != null && browser.useCustomTab) {
-            mCustomTabManager.bind(browser.packageName);
-        }
-    }
-
-    public CustomTabManager getCustomTabManager() {
-        return mCustomTabManager;
-    }
-
-    /**
-     * Returns the BrowserDescriptor of the chosen browser.
-     * Can for example be used to set the browsers package name to a CustomTabsIntent.
-     */
-    public BrowserDescriptor getBrowserDescriptor() {
-        return mBrowser;
-    }
-
-    /**
-     * Creates a custom tab builder, that will use a tab session from an existing connection to
-     * a web browser, if available.
-     */
-    public CustomTabsIntent.Builder createCustomTabsIntentBuilder(Uri... possibleUris) {
-        checkNotDisposed();
-        return mCustomTabManager.createTabBuilder(possibleUris);
-    }
-
-    /**
-     * Sends an authorization request to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs)
-     * if available, or a browser instance.
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
-     * If the user cancels the authorization request, the current activity will regain control.
-     */
-    public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                null,
-                createCustomTabsIntentBuilder().build());
-    }
-
-    /**
-     * Sends an authorization request to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs)
-     * if available, or a browser instance.
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
-     * If the user cancels the authorization request, the provided
-     * {@link PendingIntent cancel PendingIntent} will be invoked.
-     */
-    public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent,
-            @NonNull PendingIntent canceledIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                canceledIntent,
-                createCustomTabsIntentBuilder().build());
-    }
-
-    /**
-     * Sends an authorization request to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs).
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
-     * If the user cancels the authorization request, the current activity will regain control.
-     *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
-     */
-    public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent,
-            @NonNull CustomTabsIntent customTabsIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                null,
-                customTabsIntent);
     }
 
     /**
@@ -210,11 +72,6 @@ public class AuthorizationService {
      * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
      * If the user cancels the authorization request, the provided
      * {@link PendingIntent cancel PendingIntent} will be invoked.
-     *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
      *
      * @throws android.content.ActivityNotFoundException if no suitable browser is available to
      *     perform the authorization flow.
@@ -222,14 +79,11 @@ public class AuthorizationService {
     public void performAuthorizationRequest(
             @NonNull AuthorizationRequest request,
             @NonNull PendingIntent completedIntent,
-            @Nullable PendingIntent canceledIntent,
-            @NonNull CustomTabsIntent customTabsIntent) {
-        checkNotDisposed();
+            @Nullable PendingIntent canceledIntent) {
         checkNotNull(request);
         checkNotNull(completedIntent);
-        checkNotNull(customTabsIntent);
 
-        Intent authIntent = prepareAuthorizationRequestIntent(request, customTabsIntent);
+        Intent authIntent = prepareAuthorizationRequestIntent(request);
         mContext.startActivity(AuthorizationManagementActivity.createStartIntent(
                 mContext,
                 request,
@@ -251,49 +105,17 @@ public class AuthorizationService {
      * {@link Activity#RESULT_OK} indicates the authorization request completed,
      * not necessarily that it was a successful authorization.
      *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
-     *
      * @throws android.content.ActivityNotFoundException if no suitable browser is available to
      *     perform the authorization flow.
      */
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public Intent getAuthorizationRequestIntent(
-            @NonNull AuthorizationRequest request,
-            @NonNull CustomTabsIntent customTabsIntent) {
+            @NonNull AuthorizationRequest request) {
 
-        Intent authIntent = prepareAuthorizationRequestIntent(request, customTabsIntent);
+        Intent authIntent = prepareAuthorizationRequestIntent(request);
         return AuthorizationManagementActivity.createStartForResultIntent(
                 mContext,
                 request,
                 authIntent);
-    }
-
-    /**
-     * Constructs an intent that encapsulates the provided request and a default custom tabs intent,
-     * and is intended to be launched via {@link Activity#startActivityForResult}
-     * When started, the intent launches an {@link Activity} that sends an authorization request
-     * to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs).
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the activity that gets launched will call {@link Activity#setResult} with
-     * {@link Activity#RESULT_OK} and an {@link Intent} containing authorization completion
-     * information. If the user presses the back button or closes the browser tab, the launched
-     * activity will call {@link Activity#setResult} with
-     * {@link Activity#RESULT_CANCELED} without a data {@link Intent}. Note that
-     * {@link Activity#RESULT_OK} indicates the authorization request completed,
-     * not necessarily that it was a successful authorization.
-     *
-     * @throws android.content.ActivityNotFoundException if no suitable browser is available to
-     *     perform the authorization flow.
-     */
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public Intent getAuthorizationRequestIntent(
-            @NonNull AuthorizationRequest request) {
-        return getAuthorizationRequestIntent(request, createCustomTabsIntentBuilder().build());
     }
 
     /**
@@ -316,7 +138,6 @@ public class AuthorizationService {
             @NonNull TokenRequest request,
             @NonNull ClientAuthentication clientAuthentication,
             @NonNull TokenResponseCallback callback) {
-        checkNotDisposed();
         Logger.debug("Initiating code exchange request to %s",
                 request.configuration.tokenEndpoint);
         new TokenRequestTask(
@@ -335,7 +156,6 @@ public class AuthorizationService {
     public void performRegistrationRequest(
             @NonNull RegistrationRequest request,
             @NonNull RegistrationResponseCallback callback) {
-        checkNotDisposed();
         Logger.debug("Initiating dynamic client registration %s",
                 request.configuration.registrationEndpoint.toString());
         new RegistrationRequestTask(
@@ -345,43 +165,10 @@ public class AuthorizationService {
                 .execute();
     }
 
-    /**
-     * Disposes state that will not normally be handled by garbage collection. This should be
-     * called when the authorization service is no longer required, including when any owning
-     * activity is paused or destroyed (i.e. in {@link android.app.Activity#onStop()}).
-     */
-    public void dispose() {
-        if (mDisposed) {
-            return;
-        }
-        mCustomTabManager.dispose();
-        mDisposed = true;
-    }
-
-    private void checkNotDisposed() {
-        if (mDisposed) {
-            throw new IllegalStateException("Service has been disposed and rendered inoperable");
-        }
-    }
-
-    private Intent prepareAuthorizationRequestIntent(
-            AuthorizationRequest request,
-            CustomTabsIntent customTabsIntent) {
-        checkNotDisposed();
-
-        if (mBrowser == null) {
-            throw new ActivityNotFoundException();
-        }
-
+    private Intent prepareAuthorizationRequestIntent(AuthorizationRequest request) {
         Uri requestUri = request.toUri();
         Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setPackage(mBrowser.packageName);
         intent.setData(requestUri);
-
-        Logger.debug("Using %s as browser for auth, custom tab = %s",
-                intent.getPackage(),
-                mBrowser.useCustomTab.toString());
-
         Logger.debug("Initiating authorization request to %s",
                 request.configuration.authorizationEndpoint);
 
@@ -391,11 +178,11 @@ public class AuthorizationService {
     private static class TokenRequestTask
             extends AsyncTask<Void, Void, JSONObject> {
 
-        private TokenRequest mRequest;
-        private ClientAuthentication mClientAuthentication;
+        private final TokenRequest mRequest;
+        private final ClientAuthentication mClientAuthentication;
         private final ConnectionBuilder mConnectionBuilder;
-        private TokenResponseCallback mCallback;
-        private Clock mClock;
+        private final TokenResponseCallback mCallback;
+        private final Clock mClock;
 
         private AuthorizationException mException;
 
@@ -564,9 +351,9 @@ public class AuthorizationService {
 
     private static class RegistrationRequestTask
             extends AsyncTask<Void, Void, JSONObject> {
-        private RegistrationRequest mRequest;
+        private final RegistrationRequest mRequest;
         private final ConnectionBuilder mConnectionBuilder;
-        private RegistrationResponseCallback mCallback;
+        private final RegistrationResponseCallback mCallback;
 
         private AuthorizationException mException;
 

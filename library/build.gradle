@@ -23,7 +23,6 @@ android.buildTypes {
 android.testBuildType "forTests"
 
 dependencies {
-    api "androidx.browser:browser:${project.androidXVersions.browser}"
     implementation "androidx.annotation:annotation:${project.androidXVersions.annotation}"
     apply from: '../config/testdeps.gradle', to:it
 }

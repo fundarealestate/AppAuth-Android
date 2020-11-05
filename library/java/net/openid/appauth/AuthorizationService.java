@@ -374,12 +374,7 @@ public class AuthorizationService {
         }
 
         Uri requestUri = request.toUri();
-        Intent intent;
-        if (mBrowser.useCustomTab) {
-            intent = customTabsIntent.intent;
-        } else {
-            intent = new Intent(Intent.ACTION_VIEW);
-        }
+        Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setPackage(mBrowser.packageName);
         intent.setData(requestUri);
 

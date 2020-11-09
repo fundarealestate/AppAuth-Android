@@ -325,18 +325,7 @@ public class AuthState {
 
     @VisibleForTesting
     boolean getNeedsTokenRefresh(Clock clock) {
-        if (mNeedsTokenRefreshOverride) {
-            return true;
-        }
-
-        if (getAccessTokenExpirationTime() == null) {
-            // if there is no expiration but we have an access token, it is assumed
-            // to never expire.
-            return getAccessToken() == null;
-        }
-
-        return getAccessTokenExpirationTime()
-                <= clock.getCurrentTimeMillis() + EXPIRY_TIME_TOLERANCE_MS;
+        return true;
     }
 
     /**
